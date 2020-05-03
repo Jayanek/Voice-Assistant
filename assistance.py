@@ -137,7 +137,7 @@ def get_date(text):
 
 
 service = calender_service()
-get_events(3, service)
+#get_events(3, service)
 
 text = get_audio()
 print(get_date(text))
