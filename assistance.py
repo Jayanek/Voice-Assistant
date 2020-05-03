@@ -10,37 +10,40 @@ import time
 import speech_recognition as sr
 from gtts import gTTS
 import playsound
+import datetime
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
+MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",
+          "december"]
+DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+DAY_EXTENTIONS = ["rd", "th", "st", "nd"]
+
+
 def speak(text):
     tts = gTTS(text=text, lang="en")
-    filename="voice.mp3"
+    filename = "voice.mp3"
     tts.save(filename)
     playsound.playsound(filename)
 
 
 def get_audio():
-    r=sr.Recognizer()
+    r = sr.Recognizer()
     with sr.Microphone() as source:
         audio = r.listen(source)
-        said=""
+        said = ""
 
         try:
-            said=r.recognize_google(audio)
+            said = r.recognize_google(audio)
             print(said)
         except Exception as e:
-            print("Exception: "+str(e))
+            print("Exception: " + str(e))
 
         return said
 
 
-
-
-
 def calender_service():
-
     creds = None
     # The file token.pickle stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -64,14 +67,14 @@ def calender_service():
 
     return service
 
-def get_events(n,service):
 
+def get_events(n, service):
     # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+    now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
     print(f'Getting the upcoming {n} events')
     events_result = service.events().list(calendarId='primary', timeMin=now,
-                                        maxResults=n, singleEvents=True,
-                                        orderBy='startTime').execute()
+                                          maxResults=n, singleEvents=True,
+                                          orderBy='startTime').execute()
     events = events_result.get('items', [])
 
     if not events:
@@ -80,6 +83,61 @@ def get_events(n,service):
         start = event['start'].get('dateTime', event['start'].get('date'))
         print(start, event['summary'])
 
-service = calender_service()
-get_events(3,service)
 
+def get_date(text):
+    text = text.lower()
+    today = datetime.date.today()
+
+    if text.count("today") > 0:
+        return today
+
+    month = -1
+    day = -1
+    day_of_the_week = -1
+    year = today.year
+
+    for word in text.split():
+        if word in MONTHS:
+            month = MONTHS.index(word) + 1
+        elif word in DAYS:
+            day_of_the_week = DAYS.index(word) + 1
+        elif word.isdigit():
+            day = int(word)
+        else:
+            for ext in DAY_EXTENTIONS:
+                found = word.find(ext)
+                if found > 0:
+                    try:
+                        day = int(word[:found])
+                    except:
+                        pass
+
+    if (month < today.month) and (month != -1):
+        year = today.year + 1
+
+    if month == -1 and day != -1:
+        if day < today.day:
+            month = today.month + 1
+        else:
+            month = today.month
+
+    if month == -1 and day == -1 and day_of_the_week != -1:
+        current_day = today.weekday()
+        dif = day_of_the_week - current_day
+
+        if dif < 0:
+            dif += 7
+            if text.count("next") >=1 :
+                dif += 7
+
+        return today + datetime.timedelta(dif)
+
+    if day != -1:
+        return datetime.date(year=year, month=month, day=day)
+
+
+service = calender_service()
+get_events(3, service)
+
+text = get_audio()
+print(get_date(text))
