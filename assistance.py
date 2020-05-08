@@ -8,10 +8,9 @@ from google.auth.transport.requests import Request
 import os
 import time
 import speech_recognition as sr
-from gtts import gTTS
-import playsound
+import pyttsx3
 import datetime
-
+import pytz
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
@@ -22,10 +21,10 @@ DAY_EXTENTIONS = ["rd", "th", "st", "nd"]
 
 
 def speak(text):
-    tts = gTTS(text=text, lang="en")
-    filename = "voice.mp3"
-    tts.save(filename)
-    playsound.playsound(filename)
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
+
 
 
 def get_audio():
@@ -68,12 +67,14 @@ def calender_service():
     return service
 
 
-def get_events(n, service):
-    # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
-    print(f'Getting the upcoming {n} events')
-    events_result = service.events().list(calendarId='primary', timeMin=now,
-                                          maxResults=n, singleEvents=True,
+def get_events(day, service):
+    date = datetime.datetime.combine(day, datetime.datetime.min.time())
+    end = datetime.datetime.combine(day, datetime.datetime.max.time())
+    utc = pytz.UTC
+    date = date.astimezone(utc)
+    end = end.astimezone(utc)
+    events_result = service.events().list(calendarId='primary', timeMin=date.isoformat(), timeMax=end.isoformat(),
+                                          singleEvents=True,
                                           orderBy='startTime').execute()
     events = events_result.get('items', [])
 
@@ -91,8 +92,8 @@ def get_date(text):
     if text.count("today") > 0:
         return today
 
-    month = -1
     day = -1
+    month = -1
     day_of_the_week = -1
     year = today.year
 
@@ -112,32 +113,29 @@ def get_date(text):
                     except:
                         pass
 
-    if (month < today.month) and (month != -1):
+    if day == -1 and month != -1 and month < today.month:
         year = today.year + 1
 
-    if month == -1 and day != -1:
-        if day < today.day:
-            month = today.month + 1
-        else:
-            month = today.month
+    if day != -1 and day < today.day and month == -1:
+        month = today.month + 1
 
-    if month == -1 and day == -1 and day_of_the_week != -1:
-        current_day = today.weekday()
-        dif = day_of_the_week - current_day
-
+    if day == -1 and month == -1 and day_of_the_week != -1:
+        current_week_day = today.weekday()
+        dif = current_week_day - day_of_the_week
         if dif < 0:
             dif += 7
-            if text.count("next") >=1 :
+            if text.count("next") >= 1:
                 dif += 7
 
         return today + datetime.timedelta(dif)
-
+    if month == -1 or day == -1:
+        return None
     if day != -1:
         return datetime.date(year=year, month=month, day=day)
 
 
-service = calender_service()
-#get_events(3, service)
-
+SERVICE = calender_service()
 text = get_audio()
-print(get_date(text))
+get_events(get_date(text), SERVICE)
+
+
